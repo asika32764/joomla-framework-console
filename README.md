@@ -531,7 +531,7 @@ make sure you have `"minimum-stability": "dev"` and then run composer install.
 ``` json
 {
     "require": {
-        "joomla/console": "dev-master"
+        "asika/joomla-console": "dev-master"
     },
     "minimum-stability": "dev"
 }
@@ -541,5 +541,5 @@ Alternatively, you can simply run the following from the command line:
 
 ```
 composer init --stability="dev"
-composer require joomla/console "dev-master"
+composer require asika/joomla-console "dev-master"
 ```
