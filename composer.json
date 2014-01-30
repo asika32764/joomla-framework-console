@@ -1,0 +1,18 @@
+{
+	"name": "asika/joomla-console",
+	"type": "joomla-package",
+	"description": "3rd Joomla Console Package",
+	"keywords": ["joomla", "framework", "console"],
+	"homepage": "https://github.com/asika32764/joomla-framework-console",
+	"license": "GPL-2.0+",
+	"require": {
+		"php": ">=5.3.10",
+		"joomla/application": "1.0"
+	},
+	"target-dir": "Joomla/Console",
+	"autoload": {
+		"psr-0": {
+			"Joomla\\Console": ""
+		}
+	}
+}
