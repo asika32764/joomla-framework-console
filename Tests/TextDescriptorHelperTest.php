@@ -1,10 +1,12 @@
 <?php
 /**
- * Part of the Joomla Framework Application Package
+ * Part of the Joomla Framework Console Package
  *
  * @copyright  Copyright (C) 2005 - 2013 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
+
+namespace Joomla\Console\Tests;
 
 use Joomla\Console\Console;
 use Joomla\Console\Descriptor\Text\TextCommandDescriptor;
@@ -18,7 +20,7 @@ use Joomla\Console\Tests\Stubs\FooCommand;
  *
  * @since  1.0
  */
-class TextDescriptorHelperTest extends PHPUnit_Framework_TestCase
+class TextDescriptorHelperTest extends \PHPUnit_Framework_TestCase
 {
 	/**
 	 * Test instance.
@@ -91,18 +93,18 @@ foo help';
 			->setDescription('foo desc')
 			->setUsage('foo command option')
 			->setHelp('foo help')
-			->addArgument(
+			->addCommand(
 				'bar',
 				'Bar command desc'
 			)
-			->addArgument('yoo')
+			->addCommand('yoo')
 			->addOption(array('q', 'quiet'), 'default', 'q desc');
 
 		$result = $this->instance->describe($command);
 
 		$this->assertEquals(
-			str_replace(array("\r", "\n"), '', trim($compare)),
-			str_replace(array("\r", "\n"), '', trim($result))
+			str_replace(PHP_EOL, "\n", trim($compare)),
+			str_replace(PHP_EOL, "\n", trim($result))
 		);
 	}
 }

@@ -13,6 +13,8 @@ use Joomla\Application\Cli\Output\Stdout;
 use Joomla\Application\Cli\CliOutput;
 use Joomla\Console\Exception\CommandNotFoundException;
 use Joomla\Console\Option\Option;
+use Joomla\Console\Option\OptionSet;
+use Joomla\Console\Prompter\PrompterInterface;
 use Joomla\Input;
 
 /**
@@ -20,7 +22,7 @@ use Joomla\Input;
  *
  * @since  1.0
  */
-abstract class AbstractCommand
+abstract class AbstractCommand implements \ArrayAccess
 {
 	/**
 	 * Console application.
@@ -59,43 +61,31 @@ abstract class AbstractCommand
 	protected $name;
 
 	/**
-	 * The Arguments(SubCommends) storage.
+	 * The children(SubCommends) storage.
 	 *
 	 * @var array
 	 *
 	 * @since  1.0
 	 */
-	protected $arguments = array();
+	protected $children = array();
 
 	/**
 	 * The Options storage.
 	 *
-	 * @var array
+	 * @var OptionSet
 	 *
 	 * @since  1.0
 	 */
-	protected $options = array();
+	protected $options = null;
 
 	/**
 	 * Global Options.
 	 *
-	 * @var array
+	 * @var OptionSet
 	 *
 	 * @since  1.0
 	 */
-	protected $globalOptions = array();
-
-	/**
-	 * Alias of options.
-	 *
-	 * @var array
-	 *
-	 * @since  1.0
-	 */
-	protected $optionAlias = array(
-		'global' => array(),
-		'private' => array()
-	);
+	protected $globalOptions = null;
 
 	/**
 	 * The command description.
@@ -127,11 +117,11 @@ abstract class AbstractCommand
 	/**
 	 * The closure to execute.
 	 *
-	 * @var  \Closure
+	 * @var  callable
 	 *
 	 * @since  1.0
 	 */
-	protected $code;
+	protected $handler;
 
 	/**
 	 * The parent Console if this is a sub comment.
@@ -161,6 +151,9 @@ abstract class AbstractCommand
 		$this->output = $output ?: new Stdout;
 		$this->parent = $parent;
 
+		$this->options       = new OptionSet;
+		$this->globalOptions = new OptionSet;
+
 		$this->configure();
 
 		if (!$this->name)
@@ -178,7 +171,7 @@ abstract class AbstractCommand
 	 */
 	public function execute()
 	{
-		if (count($this->arguments) && count($this->input->args))
+		if (count($this->children) && count($this->input->args))
 		{
 			$name = $this->input->args[0];
 
@@ -188,7 +181,7 @@ abstract class AbstractCommand
 			}
 			catch (CommandNotFoundException $e)
 			{
-				$e->getCommand()->renderAlternatives($e->getArgument(), $e);
+				$e->getCommand()->renderAlternatives($e->getChild(), $e);
 
 				return $e->getCode();
 			}
@@ -200,17 +193,17 @@ abstract class AbstractCommand
 			}
 		}
 
-		if ($this->code)
+		if ($this->handler)
 		{
-			if ($this->code instanceof \Closure)
+			if ($this->handler instanceof \Closure)
 			{
-				$code = $this->code;
+				$code = $this->handler;
 
 				return $code($this);
 			}
-			elseif (is_callable($this->code))
+			elseif (is_callable($this->handler))
 			{
-				return call_user_func_array($this->code, array($this));
+				return call_user_func($this->handler, $this);
 			}
 		}
 
@@ -222,7 +215,7 @@ abstract class AbstractCommand
 	 *
 	 * @throws \LogicException
 	 *
-	 * @return void
+	 * @return mixed
 	 *
 	 * @since  1.0
 	 */
@@ -256,13 +249,13 @@ abstract class AbstractCommand
 	 */
 	protected function executeSubCommand($name, Input\Cli $input = null, CliOutput $output = null)
 	{
-		if (empty($this->arguments[$name]))
+		if (empty($this->children[$name]))
 		{
 			throw new CommandNotFoundException(sprintf('Command "%s" not found.', $name), $this, $name);
 		}
 
 		/** @var $subCommand AbstractCommand */
-		$subCommand = $this->arguments[$name];
+		$subCommand = $this->children[$name];
 
 		// Remove first argument and send it to child
 		if (!$input)
@@ -376,6 +369,87 @@ abstract class AbstractCommand
 	/**
 	 * Add an argument(sub command) setting.
 	 *
+	 * @param   string|AbstractCommand  $command      The argument name or Console object.
+	 *                                                If we just send a string, the object will auto create.
+	 * @param   null                    $description  Console description.
+	 * @param   array                   $options      Console options.
+	 * @param   \Closure                $code         The closure to execute.
+	 *
+	 * @return  AbstractCommand  Return this object to support chaining.
+	 *
+	 * @since   1.0
+	 */
+	public function addCommand($command, $description = null, $options = array(), \Closure $code = null)
+	{
+		if (!($command instanceof AbstractCommand))
+		{
+			$command = new static($command, $this->input, $this->output, $this);
+		}
+
+		// Set argument detail
+		$command->setApplication($this->application)
+			->setInput($this->input);
+
+		if ($description !== null)
+		{
+			$command->setDescription($description);
+		}
+
+		if (count($options))
+		{
+			$command->setOptions($options);
+		}
+
+		if ($code)
+		{
+			$command->setHandler($code);
+		}
+
+		// Set parent
+		$command->setParent($this);
+
+		// Set global options to sub command
+		/** @var $option Option */
+		foreach ($this->globalOptions as $option)
+		{
+			$command->addOption($option);
+		}
+
+		$name  = $command->getName();
+
+		$this->children[$name] = $command;
+
+		return $this;
+	}
+
+	/**
+	 * Get argument by offset or return default.
+	 *
+	 * @param   int                      $offset   Argument offset.
+	 * @param   PrompterInterface|mixed  $default  Default value, if is a prompter object, will execute ask().
+	 *
+	 * @return  null|string  Values from argument or user input.
+	 */
+	public function getArgument($offset, $default = null)
+	{
+		$args = $this->input->args;
+
+		if (isset($args[$offset]))
+		{
+			return $args[$offset];
+		}
+
+		if ($default instanceof PrompterInterface)
+		{
+			return $default->ask(null, $default);
+		}
+
+		return $default;
+	}
+
+	/**
+	 * Alias of addCommand for legacy.
+	 *
 	 * @param   string|AbstractCommand  $argument     The argument name or Console object.
 	 *                                                If we just send a string, the object will auto create.
 	 * @param   null                    $description  Console description.
@@ -384,106 +458,90 @@ abstract class AbstractCommand
 	 *
 	 * @return  AbstractCommand  Return this object to support chaining.
 	 *
-	 * @since  1.0
+	 * @since      1.0
+	 * @deprecated This method will be removed.
 	 */
 	public function addArgument($argument, $description = null, $options = array(), \Closure $code = null)
 	{
-		if (!($argument instanceof AbstractCommand))
-		{
-			$argument = new static($argument, $this->input, $this->output, $this);
-		}
-
-		// Set argument detail
-		$argument->setApplication($this->application)
-			->setInput($this->input);
-
-		if ($description !== null)
-		{
-			$argument->setDescription($description);
-		}
-
-		if (count($options))
-		{
-			$argument->setOptions($options);
-		}
-
-		if ($code)
-		{
-			$argument->setCode($code);
-		}
-
-		// Set parent
-		$argument->setParent($this);
-
-		// Set global options to sub command
-		/** @var $option Option */
-		foreach ($this->globalOptions as $option)
-		{
-			$argument->addOption($option);
-
-			$alias  = $option->getAlias();
-			$global = $option->isGlobal();
-
-			foreach ($alias as $var)
-			{
-				$argument->setOptionAlias($option->getName(), $var, $global);
-			}
-		}
-
-		$name  = $argument->getName();
-
-		$this->arguments[$name] = $argument;
-
-		return $this;
+		return $this->addCommand($argument, $description, $options, $code);
 	}
 
 	/**
-	 * Get a argument(command) by name.
+	 * Alias of addCommand if someone think child is more semantic.
 	 *
-	 * @param   string  $name  Argument name.
-	 *
-	 * @return  AbstractCommand|null  Return command or null.
-	 *
-	 * @since  1.0
-	 */
-	public function getArgument($name)
-	{
-		if (!empty($this->arguments[$name]))
-		{
-			return $this->arguments[$name];
-		}
-
-		return null;
-	}
-
-	/**
-	 * Get arguments array.
-	 *
-	 * @return array  Arguments.
-	 *
-	 * @since  1.0
-	 */
-	public function getArguments()
-	{
-		return $this->arguments;
-	}
-
-	/**
-	 * Batch set arguments (sub commands).
-	 *
-	 * @param   array  $arguments  An array include argument objects.
+	 * @param   string|AbstractCommand  $argument     The argument name or Console object.
+	 *                                                If we just send a string, the object will auto create.
+	 * @param   null                    $description  Console description.
+	 * @param   array                   $options      Console options.
+	 * @param   \Closure                $code         The closure to execute.
 	 *
 	 * @return  AbstractCommand  Return this object to support chaining.
 	 *
 	 * @since   1.0
 	 */
-	public function setArguments($arguments)
+	public function addChild($argument, $description = null, $options = array(), \Closure $code = null)
 	{
-		$arguments = (array) $arguments;
+		return $this->addCommand($argument, $description, $options, $code);
+	}
 
-		foreach ($arguments as $argument)
+	/**
+	 * Get a argument(command) by name path.
+	 *
+	 * @param   string  $path  Command name path.
+	 *
+	 * @return  AbstractCommand|null  Return command or null.
+	 *
+	 * @since  1.0
+	 */
+	public function getChild($path)
+	{
+		$path    = str_replace(array('/', '\\'), '\\', $path);
+		$names   = explode('\\', $path);
+		$command = $this;
+
+		foreach ($names as $name)
 		{
-			$this->addArgument($argument);
+			if (isset($command[$name]))
+			{
+				$command = $command[$name];
+
+				continue;
+			}
+
+			return null;
+		}
+
+		return $command;
+	}
+
+	/**
+	 * Get children array.
+	 *
+	 * @return array  children.
+	 *
+	 * @since  1.0
+	 */
+	public function getChildren()
+	{
+		return $this->children;
+	}
+
+	/**
+	 * Batch set children (sub commands).
+	 *
+	 * @param   array  $children  An array include argument objects.
+	 *
+	 * @return  AbstractCommand  Return this object to support chaining.
+	 *
+	 * @since   1.0
+	 */
+	public function setChildren($children)
+	{
+		$children = (array) $children;
+
+		foreach ($children as $argument)
+		{
+			$this->addCommand($argument);
 		}
 
 		return $this;
@@ -512,7 +570,6 @@ abstract class AbstractCommand
 		$option->setInput($this->input);
 
 		$name   = $option->getName();
-		$alias  = $option->getAlias();
 		$global = $option->isGlobal();
 
 		if ($global)
@@ -521,6 +578,12 @@ abstract class AbstractCommand
 
 			// Global option should not equal to private option
 			unset($this->options[$name]);
+
+			// We should pass global option to all children.
+			foreach ($this->children as $child)
+			{
+				$child->addOption($option);
+			}
 		}
 		else
 		{
@@ -529,8 +592,6 @@ abstract class AbstractCommand
 			// Global option should not equal to private option
 			unset($this->globalOptions[$name]);
 		}
-
-		$this->setOptionAlias($name, $alias, $global);
 
 		return $this;
 	}
@@ -541,7 +602,7 @@ abstract class AbstractCommand
 	 * If the name not found, we use alias to find options.
 	 *
 	 * @param   string  $name     The option name.
-	 * @param   string  $default  The default value when option not setted.
+	 * @param   string  $default  The default value when option not set.
 	 *
 	 * @return  mixed  The option value we want to get or default value if option not exists.
 	 *
@@ -549,38 +610,18 @@ abstract class AbstractCommand
 	 */
 	public function getOption($name, $default = null)
 	{
-		$options = $this->options;
-
 		// Get from private
-		if (empty($this->options[$name]))
+		$option = $this->options[$name];
+
+		if (!$option)
 		{
-			// Get from private alias
-			if (!empty($this->optionAlias['private'][$name]))
-			{
-				$name = $this->optionAlias['private'][$name];
-			}
-			// Get from global
-			else
-			{
-				$options = $this->globalOptions;
-
-				// Get from global alias
-				if (!empty($this->optionAlias['global'][$name]))
-				{
-					$name = $this->optionAlias['global'][$name];
-				}
-			}
+			$option = $this->globalOptions[$name];
 		}
-
-		if (empty($options[$name]))
-		{
-			return $default;
-		}
-
-		$option = $options[$name];
 
 		if ($option instanceof Option)
 		{
+			$option->setInput($this->input);
+
 			return $option->getValue();
 		}
 		else
@@ -590,15 +631,31 @@ abstract class AbstractCommand
 	}
 
 	/**
-	 * Get options.
+	 * Get options as array.
 	 *
-	 * @return mixed  The options array.
+	 * @param   boolean  $global  is Global options.
 	 *
-	 * @since  1.0
+	 * @return  mixed  The options array.
+	 *
+	 * @since   1.0
 	 */
-	public function getOptions()
+	public function getOptions($global = false)
 	{
-		return $this->options;
+		return $global ? (array) $this->options : (array) $this->globalOptions;
+	}
+
+	/**
+	 * Get option set object.
+	 *
+	 * @param   boolean  $global  is Global options.
+	 *
+	 * @return  mixed  The options array.
+	 *
+	 * @since   1.0
+	 */
+	public function getOptionSet($global = false)
+	{
+		return $global ? $this->globalOptions : $this->options;
 	}
 
 	/**
@@ -610,7 +667,7 @@ abstract class AbstractCommand
 	 */
 	public function getAllOptions()
 	{
-		return array_merge($this->globalOptions, $this->options);
+		return array_merge((array) $this->globalOptions, (array) $this->options);
 	}
 
 	/**
@@ -629,6 +686,31 @@ abstract class AbstractCommand
 		foreach ($options as $option)
 		{
 			$this->addOption($option);
+		}
+
+		return $this;
+	}
+
+	/**
+	 * set the option alias.
+	 *
+	 * @param   mixed   $aliases  The alias to map this option.
+	 * @param   string  $name     The option name.
+	 * @param   bool    $global   Is global option?
+	 *
+	 * @return  AbstractCommand  Return this object to support chaining.
+	 *
+	 * @since   1.0
+	 */
+	public function setOptionAlias($aliases, $name, $global = false)
+	{
+		if ($global)
+		{
+			$this->globalOptions->setAlias($aliases, $name);
+		}
+		else
+		{
+			$this->options->setAlias($aliases, $name);
 		}
 
 		return $this;
@@ -697,60 +779,23 @@ abstract class AbstractCommand
 	 *
 	 * @since   1.0
 	 */
-	public function getCode()
+	public function getHandler()
 	{
-		return $this->code;
+		return $this->handler;
 	}
 
 	/**
 	 * Console execute code setter.
 	 *
-	 * @param   \Closure  $code  Console execute code.
+	 * @param   callable  $handler  Console execute handler.
 	 *
 	 * @return  AbstractCommand  Return this object to support chaining.
 	 *
 	 * @since   1.0
 	 */
-	public function setCode(\Closure $code = null)
+	public function setHandler($handler = null)
 	{
-		$this->code = $code;
-
-		return $this;
-	}
-
-	/**
-	 * Get the options alias.
-	 *
-	 * @return  array  The option alias.
-	 *
-	 * @since   1.0
-	 */
-	public function getOptionAlias()
-	{
-		return $this->optionAlias;
-	}
-
-	/**
-	 * Sets the option alias.
-	 *
-	 * @param   string  $name    The option name.
-	 * @param   string  $alias   The alias to map this option.
-	 * @param   bool    $global  Is global option?
-	 *
-	 * @return  AbstractCommand  Return this object to support chaining.
-	 *
-	 * @since   1.0
-	 */
-	public function setOptionAlias($name, $alias, $global = false)
-	{
-		$subKey = $global ? 'global' : 'private';
-
-		$alias = (array) $alias;
-
-		foreach ($alias as $var)
-		{
-			$this->optionAlias[$subKey][$var] = $name;
-		}
+		$this->handler = $handler;
 
 		return $this;
 	}
@@ -857,7 +902,7 @@ abstract class AbstractCommand
 		$alternatives = array();
 
 		// Autocomplete
-		foreach ($this->arguments as $command)
+		foreach ($this->children as $command)
 		{
 			/** @var $command Command */
 			$commandName = $command->getName();
@@ -866,9 +911,9 @@ abstract class AbstractCommand
 			 * Here we use "Levenshtein distance" to compare wrong name with every command names.
 			 *
 			 * If the difference number less than 1/3 of wrong name which user typed, means this is a similar name,
-			 * we can prompt user to choose these similar names.
+			 * we can notice user to choose these similar names.
 			 *
-			 * And if the string of wrong name can be found in a command name, we also prompt user to choose it.
+			 * And if the string of wrong name can be found in a command name, we also notice user to choose it.
 			 */
 			if (levenshtein($wrongName, $commandName) <= (strlen($wrongName) / 3) || strpos($commandName, $wrongName) !== false)
 			{
@@ -943,7 +988,14 @@ EOF;
 	 */
 	public function err($text = '', $nl = true)
 	{
-		$this->output->err($text, $nl);
+		if ($this->output instanceof \Joomla\Console\Output\Stdout)
+		{
+			$this->output->err($text, $nl);
+		}
+		else
+		{
+			$this->output->out($text, $nl);
+		}
 
 		return $this;
 	}
@@ -965,5 +1017,62 @@ EOF;
 		}
 
 		return rtrim(fread(STDIN, 8192), "\n");
+	}
+
+	/**
+	 * Set child command, note the key is no use, we use command name as key.
+	 *
+	 * @param   mixed            $offset  No use here.
+	 * @param   AbstractCommand  $value   Command object.
+	 *
+	 * @return  void
+	 *
+	 * @since   1.0
+	 */
+	public function offsetSet($offset, $value)
+	{
+		$this->addCommand($value);
+	}
+
+	/**
+	 * Is a child exists?
+	 *
+	 * @param   string  $offset  The command name to get command.
+	 *
+	 * @return  boolean  True if command exists.
+	 *
+	 * @since   1.0
+	 */
+	public function offsetExists($offset)
+	{
+		return isset($this->children[$offset]);
+	}
+
+	/**
+	 * Unset a child command.
+	 *
+	 * @param   string  $offset  The command name to remove.
+	 *
+	 * @return  void
+	 *
+	 * @since   1.0
+	 */
+	public function offsetUnset($offset)
+	{
+		unset($this->children[$offset]);
+	}
+
+	/**
+	 * Get a command by name.
+	 *
+	 * @param   string  $offset  The command name to get command.
+	 *
+	 * @return  AbstractCommand|null  Return command object if found.
+	 *
+	 * @since   1.0
+	 */
+	public function offsetGet($offset)
+	{
+		return isset($this->children[$offset]) ? $this->children[$offset] : null;
 	}
 }

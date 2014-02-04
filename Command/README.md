@@ -59,7 +59,7 @@ try
             'Yell will make output upper case.',
             Option::IS_PRIVATE // sub command will not extends normal option
         )
-        ->setCode(
+        ->setHandler(
             function($command, $input, $output)
             {
                 if (empty($input->args[0]))
@@ -161,14 +161,14 @@ try
             Option::IS_GLOBAL
         )
         // First level code
-        ->setCode(
+        ->setHandler(
             function($command, $input, $output)
             {
                 $output->out('First level command.');
             }
         )
         // Second level commend
-        ->addArgument(
+        ->addCommand(
             'second',
             'The second level argument',
             array(
@@ -237,7 +237,7 @@ class FooCommand extends Command
 	{
 		$this->setName('foo')
 		    ->setDescription('foo desc')
-			->addArgument(new Foo\BarCommand)
+			->addCommand(new Foo\BarCommand)
 			->addOption(
 			    'q',
 			    0,

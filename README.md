@@ -108,7 +108,7 @@ Welcome to Joomla! Console.
 
 ### Set Executing Code for DefaultCommand
 
-We can add closure to every commands, that this command will execute this function first. Use `setCode()` on
+We can add closure to every commands, that this command will execute this function first. Use `setHandler()` on
 `$console`, the Console will auto pass the code to DefaultCommand:
 
 ``` php
@@ -117,7 +117,7 @@ We can add closure to every commands, that this command will execute this functi
 
 // ...
 
-$console->setCode(
+$console->setHandler(
 	function($command)
 	{
 		$command->out('This is default command.');
@@ -139,7 +139,7 @@ This will do same action:
 
 $console
     ->getDefaultCommand() // Return the DefaultCommand
-    ->setCode(
+    ->setHandler(
         function($command)
         {
             $command->out('This is default command.');
@@ -221,7 +221,7 @@ $console->register('foo')
 	->setDescription('This is first level foo command.')
 	->setUsage('foo command [--option]')
 	->setHelp('foo help')
-	->setCode(
+	->setHandler(
 		function($command)
 		{
 			$command->out('This is Foo Command executing code.');
@@ -370,12 +370,12 @@ HELLO: ASIKA
 
 ## Add Second Level Commands and more...
 
-If we want to add several commands after FooCommand, we can use `AddArgument()` method. Now we add two `bar` and `yoo`
+If we want to add several commands after FooCommand, we can use `addCommand()` method. Now we add two `bar` and `yoo`
 command to `FooCommand`.
 
 ### Adding command in runtime.
 
-We use `addArgument()` to add commands.
+We use `addCommand()` to add commands.
 
 If a command has one or more sub commands, the arguments means to call sub command which name equals to first argument.
 
@@ -394,11 +394,11 @@ use Joomla\Console\Option\Option;
         $this->setDescription('This is first level foo command.')
             ->setUsage('foo command [--option]')
             ->setHelp('foo help')
-            ->addArgument(
+            ->addCommand(
                 'bar',
                 'Bar description.'
             )
-            ->addArgument(
+            ->addCommand(
                 'yoo',
                 'Yoo description.',
                 array(
@@ -457,8 +457,8 @@ use Myapp\Command\Foo\YooCommand;
         $this->setDescription('This is first level foo command.')
             ->setUsage('foo command [--option]')
             ->setHelp('foo help')
-            ->addArgument(new BarCommand)
-            ->addArgument(new YooCommand);
+            ->addCommand(new BarCommand)
+            ->addCommand(new YooCommand);
     }
 ```
 
@@ -478,7 +478,7 @@ This is Bar Command executing code.
 
 `HelpCommand` will auto generate help list for us.
 
-When we use `addArgument()`, `addOption()` and set some description or other information to these objects, they will save all information in it. Then when we type `$ cli/console.php help somethine` or `$ cli/console.php somethine --help`, The HelpCommand will return the help message to us.
+When we use `addCommand()`, `addOption()` and set some description or other information to these objects, they will save all information in it. Then when we type `$ cli/console.php help somethine` or `$ cli/console.php somethine --help`, The HelpCommand will return the help message to us.
 
 Every command has these information, you can use setter and getter to access them:
 
@@ -512,7 +512,7 @@ $descriptor = new new XmlDescriptorHelper(
 );
 
 $console->getDefaultCommand()
-    ->getArgument('help')
+    ->getChild('help')
     ->setDescriptor($descriptor);
 
 // ...

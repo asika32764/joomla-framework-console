@@ -1,6 +1,6 @@
 <?php
 /**
- * Part of the Joomla Framework Application Package
+ * Part of the Joomla Framework Console Package
  *
  * @copyright  Copyright (C) 2005 - 2013 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
@@ -103,7 +103,7 @@ class ConsoleTest extends \PHPUnit_Framework_TestCase
 	{
 		$this->instance->addCommand(new FooCommand);
 
-		$this->assertEquals('foo', $this->instance->getDefaultCommand()->getArgument('foo')->getName());
+		$this->assertEquals('foo', $this->instance->getDefaultCommand()->getChild('foo')->getName());
 	}
 
 	/**
@@ -162,7 +162,7 @@ class ConsoleTest extends \PHPUnit_Framework_TestCase
 	{
 		$this->instance->register('bar');
 
-		$this->assertInstanceOf('Joomla\\Console\\Command\\Command', $this->instance->getDefaultCommand()->getArgument('bar'), 'Need Command instance');
+		$this->assertInstanceOf('Joomla\\Console\\Command\\Command', $this->instance->getDefaultCommand()->getChild('bar'), 'Need Command instance');
 	}
 
 	/**
@@ -250,16 +250,16 @@ class ConsoleTest extends \PHPUnit_Framework_TestCase
 	 *
 	 * @since  1.0
 	 */
-	public function testSetCode()
+	public function testsetHandler()
 	{
-		$this->instance->setCode(
+		$this->instance->setHandler(
 			function($command)
 			{
 				return 221;
 			}
 		);
 
-		$this->assertInstanceOf('\Closure', $this->instance->getDefaultCommand()->getCode(), 'Code need to be a closure.');
+		$this->assertInstanceOf('\Closure', $this->instance->getDefaultCommand()->getHandler(), 'Code need to be a closure.');
 
 		$this->assertEquals(221, $this->instance->getDefaultCommand()->setInput(new Input\Cli)->execute());
 	}

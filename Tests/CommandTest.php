@@ -1,10 +1,12 @@
 <?php
 /**
- * Part of the Joomla Framework Application Package
+ * Part of the Joomla Framework Console Package
  *
  * @copyright  Copyright (C) 2005 - 2013 Open Source Matters, Inc. All rights reserved.
  * @license    GNU General Public License version 2 or later; see LICENSE
  */
+
+namespace Joomla\Console\Tests;
 
 use Joomla\Console\Command\Command;
 use Joomla\Console\Command\DefaultCommand;
@@ -20,7 +22,7 @@ use Joomla\Test\TestHelper;
  *
  * @since  1.0
  */
-class CommandTest extends PHPUnit_Framework_TestCase
+class CommandTest extends \PHPUnit_Framework_TestCase
 {
 	/**
 	 * Test instance.
@@ -43,11 +45,11 @@ class CommandTest extends PHPUnit_Framework_TestCase
 		$command = new DefaultCommand('default', null, new TestStdout);
 
 		$command
-			->addArgument(
+			->addCommand(
 				'yoo',
 				'yoo desc'
 			)
-			->setCode(
+			->setHandler(
 				function($command)
 				{
 					return 123;
@@ -82,6 +84,7 @@ class CommandTest extends PHPUnit_Framework_TestCase
 	 */
 	public function testSetInput()
 	{
+		// Using mock to make sure we get same object.
 		$mockInput = $this->getMock('Joomla\Input\Cli', array('test'), array(), '', false);
 		$mockInput
 			->expects($this->any())
@@ -107,6 +110,7 @@ class CommandTest extends PHPUnit_Framework_TestCase
 	 */
 	public function testSetOutput()
 	{
+		// Using mock to make sure we get same object.
 		$mockOutput = $this->getMock('Joomla\Application\Cli\Output\Stdout', array('test'), array(), '', false);
 		$mockOutput
 			->expects($this->any())
@@ -162,11 +166,11 @@ class CommandTest extends PHPUnit_Framework_TestCase
 	 *
 	 * @since  1.0
 	 *
-	 * @covers Joomla\Console\Command\AbstractCommand::addArgument
+	 * @covers Joomla\Console\Command\AbstractCommand::addCommand
 	 */
-	public function testAddArgument()
+	public function testaddCommand()
 	{
-		$this->instance->addArgument(
+		$this->instance->addCommand(
 			'bar',
 			'bar desc',
 			array(
@@ -186,7 +190,7 @@ class CommandTest extends PHPUnit_Framework_TestCase
 			}
 		);
 
-		$command = $this->instance->getArgument('bar');
+		$command = $this->instance->getChild('bar');
 
 		$this->assertEquals(65, $command->execute(), 'Wrong exit code returned.');
 
@@ -196,11 +200,11 @@ class CommandTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals(56, $command->execute(), 'Wrong exit code returned.');
 
 		// Test send an instance
-		$this->instance->addArgument(new FooCommand);
+		$this->instance->addCommand(new FooCommand);
 
 		$this->assertInstanceOf(
 			'Joomla\\Console\\Tests\\Stubs\\FooCommand',
-			$this->instance->getArgument('foo'),
+			$this->instance->getChild('foo'),
 			'Argument not FooCommand.'
 		);
 	}
@@ -212,27 +216,27 @@ class CommandTest extends PHPUnit_Framework_TestCase
 	 *
 	 * @since  1.0
 	 *
-	 * @covers Joomla\Console\Command\AbstractCommand::getArgument
+	 * @covers Joomla\Console\Command\AbstractCommand::getChild
 	 */
-	public function testGetArgument()
+	public function testgetChild()
 	{
-		$yoo = $this->instance->getArgument('yoo');
+		$yoo = $this->instance->getChild('yoo');
 
 		$this->assertEquals('yoo desc', $yoo->getDescription(), 'Yoo command desc not match.');
 	}
 
 	/**
-	 * Test the getArguments methods.
+	 * Test the getChildren methods.
 	 *
 	 * @return void
 	 *
 	 * @since  1.0
 	 *
-	 * @covers Joomla\Console\Command\AbstractCommand::getArguments
+	 * @covers Joomla\Console\Command\AbstractCommand::getChildren
 	 */
-	public function testGetArguments()
+	public function testgetChildren()
 	{
-		$args = $this->instance->getArguments();
+		$args = $this->instance->getChildren();
 
 		$this->assertInternalType('array', $args, 'Return not array');
 
@@ -268,9 +272,14 @@ class CommandTest extends PHPUnit_Framework_TestCase
 		$this->assertSame(1, (int) $cmd->getOption('Y'), 'uppercase option value not matched.');
 
 		// Test for global option
-		$cmd->addArgument(new FooCommand);
+		$cmd->addCommand(new FooCommand);
 
-		$this->assertSame(1, (int) $cmd->getArgument('foo')->getOption('y'), 'Sub command should have global option');
+		$this->assertSame(1, (int) $cmd->getChild('foo')->getOption('y'), 'Sub command should have global option');
+
+		// Test for children
+		$bbb = $cmd->getChild('foo/aaa/bbb');
+
+		$this->assertInstanceOf('Joomla\\Console\\Option\\Option', $bbb->getOptionSet(true)->offsetGet('y'), 'Sub command "bbb" should have global option');
 	}
 
 	/**
@@ -369,17 +378,41 @@ class CommandTest extends PHPUnit_Framework_TestCase
 	 *
 	 * @since  1.0
 	 *
-	 * @covers Joomla\Console\Command\AbstractCommand::getCode
+	 * @covers Joomla\Console\Command\AbstractCommand::getHandler
 	 */
-	public function testSetAndGetCode()
+	public function testSetAndgetHandler()
 	{
-		$code = $this->instance->getCode();
+		$code = $this->instance->getHandler();
 
-		$this->assertInstanceOf('\Closure', $code, 'Code not exists');
+		$this->assertInstanceOf('\Closure', $code, 'Handler not exists');
 
-		$this->instance->setCode(null);
+		$this->instance->setHandler(null);
 
-		$this->assertEquals(null, $this->instance->getCode(), 'Code should have been cleaned');
+		$this->assertEquals(null, $this->instance->getHandler(), 'Handler should have been cleaned');
+	}
+
+	/**
+	 * Test get & set code by callable.
+	 *
+	 * @return void
+	 *
+	 * @since  1.0
+	 *
+	 * @covers Joomla\Console\Command\AbstractCommand::getHandler
+	 */
+	public function testSetAndgetCallableHandler()
+	{
+		$this->instance->setHandler(array($this, 'fakeHandler'));
+
+		$code = $this->instance->getHandler();
+
+		$this->assertTrue(is_callable($code), 'Handler not exists');
+
+		$this->assertEquals('Hello', $this->instance->execute(), 'Handler result failure.');
+
+		$this->instance->setHandler(null);
+
+		$this->assertEquals(null, $this->instance->getHandler(), 'Handler should have been cleaned');
 	}
 
 	/**
@@ -544,5 +577,17 @@ Did you mean one of these?
 		$this->instance->err('errrr', false);
 
 		$this->assertEquals('errrr', $this->instance->getOutput()->getOutput());
+	}
+
+	/**
+	 * fakeHandler
+	 *
+	 * @param $command
+	 *
+	 * @return  string
+	 */
+	public function fakeHandler($command)
+	{
+		return 'Hello';
 	}
 }

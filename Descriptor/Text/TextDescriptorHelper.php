@@ -66,7 +66,7 @@ EOF;
 		$render['option'] = count($options) ? "\n\nOptions:\n\n" . $optionDescriptor->render() : '';
 
 		// Describe Commands
-		$commands          = $command->getArguments();
+		$commands          = $command->getChildren();
 		$commandDescriptor = $this->getCommendDescriptor();
 
 		foreach ($commands as $cmd)
@@ -74,7 +74,7 @@ EOF;
 			$commandDescriptor->addItem($cmd);
 		}
 
-		$render['command'] = count($commands) ? "\n\nAvailable commands:\n\n" . $commandDescriptor->render() : '';
+		$render['command'] = count($commands) ? "\nAvailable commands:\n\n" . $commandDescriptor->render() : '';
 
 		// Render Help template
 		/** @var Console $console */

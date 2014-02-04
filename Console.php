@@ -135,7 +135,7 @@ class Console extends AbstractCliApplication
 	{
 		$command  = $this->getDefaultCommand();
 
-		if ((!$command->getCode() && !count($this->input->args)))
+		if ((!$command->getHandler() && !count($this->input->args)))
 		{
 			array_unshift($this->input->args, 'help');
 		}
@@ -154,7 +154,7 @@ class Console extends AbstractCliApplication
 		{
 			$command->renderException($e);
 
-			$exitCode = $e->getCode();
+			$exitCode = $e->getHandler();
 		}
 
 		if ($this->autoExit)
@@ -182,7 +182,7 @@ class Console extends AbstractCliApplication
 		$this->defaultCommand = new DefaultCommand(null, $this->input, $this->output);
 
 		$this->defaultCommand->setApplication($this)
-			->addArgument(new HelpCommand);
+			->addCommand(new HelpCommand);
 
 		return $this;
 	}
@@ -214,7 +214,7 @@ class Console extends AbstractCliApplication
 	 */
 	public function addCommand(AbstractCommand $command)
 	{
-		$this->getDefaultCommand()->addArgument($command);
+		$this->getDefaultCommand()->addCommand($command);
 
 		return $command;
 	}
@@ -332,15 +332,15 @@ class Console extends AbstractCliApplication
 	/**
 	 * Set execute code to default command.
 	 *
-	 * @param   \Closure  $closure  Console execute code.
+	 * @param   callable  $closure  Console execute code.
 	 *
 	 * @return  Console  Return this object to support chaining.
 	 *
 	 * @since  1.0
 	 */
-	public function setCode(\Closure $closure)
+	public function setHandler($closure)
 	{
-		$this->getDefaultCommand()->setCode($closure);
+		$this->getDefaultCommand()->setHandler($closure);
 
 		return $this;
 	}
