@@ -29,7 +29,7 @@ class TextPrompterTest extends AbstractPrompterTest
 	{
 		parent::setUp();
 
-		$this->instance = $prompter = new TextPrompter('Tell me something: ', null, $this->output);
+		$this->instance = $prompter = new TextPrompter('Tell me something: ', null, null, $this->output);
 	}
 
 	/**
@@ -50,6 +50,29 @@ class TextPrompterTest extends AbstractPrompterTest
 			trim('Tell me something: ')
 		);
 
-		$this->assertEquals($in, 'y');
+		// Ask by invoke
+		$this->setStream("n");
+
+		/** @var $prompter AbstractPrompter */
+		$prompter = $this->instance;
+		$in = $prompter();
+
+		$this->assertEquals($in, 'n');
+
+		// Set as default in command getArgument
+		$command = new \Joomla\Console\Command\Command('test', $prompter->getInput(), $this->output);
+
+		$this->setStream("fly");
+
+		$this->output->setOutput('');
+
+		$in = $command->getArgument(9, $this->instance);
+
+		$this->assertEquals(
+			trim($this->output->getOutput()),
+			trim('Tell me something: ')
+		);
+
+		$this->assertEquals($in, 'fly');
 	}
 }

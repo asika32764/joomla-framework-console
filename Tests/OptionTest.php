@@ -8,7 +8,7 @@
 
 namespace Joomla\Console\Tests;
 
-use Joomla\Console\Command\DefaultCommand;
+use Joomla\Console\Command\RootCommand;
 use Joomla\Console\Option\Option;
 
 /**
@@ -28,7 +28,7 @@ class OptionTest extends \PHPUnit_Framework_TestCase
 	/**
 	 * Test command instance.
 	 *
-	 * @var  DefaultCommand
+	 * @var  RootCommand
 	 */
 	protected $command;
 
@@ -42,7 +42,7 @@ class OptionTest extends \PHPUnit_Framework_TestCase
 	 */
 	protected function setUp()
 	{
-		$command = new DefaultCommand('default');
+		$command = new RootCommand('default');
 
 		$this->instance = $option = new Option(array('y', 'yell'), 0, 'desc', Option::IS_GLOBAL);
 

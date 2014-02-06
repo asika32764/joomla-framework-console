@@ -36,7 +36,7 @@ class SelectPrompterTest extends AbstractPrompterTest
 	{
 		parent::setUp();
 
-		$this->instance = $prompter = new SelectPrompter(null, $this->options, null, $this->output);
+		$this->instance = $prompter = new SelectPrompter(null, null, $this->options, null, $this->output);
 	}
 
 	/**

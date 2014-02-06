@@ -9,7 +9,7 @@
 namespace Joomla\Console\Tests;
 
 use Joomla\Console\Command\Command;
-use Joomla\Console\Command\DefaultCommand;
+use Joomla\Console\Command\RootCommand;
 use Joomla\Console\Console;
 use Joomla\Console\Option\Option;
 use Joomla\Console\Tests\Output\TestStdout;
@@ -42,7 +42,7 @@ class CommandTest extends \PHPUnit_Framework_TestCase
 	 */
 	protected function setUp()
 	{
-		$command = new DefaultCommand('default', null, new TestStdout);
+		$command = new RootCommand('default', null, new TestStdout);
 
 		$command
 			->addCommand(
@@ -307,6 +307,31 @@ class CommandTest extends \PHPUnit_Framework_TestCase
 		$this->assertInternalType('array', $array);
 
 		$this->assertInstanceOf('Joomla\\Console\\Option\\Option', array_shift($array), 'Array element not Option object');
+	}
+
+	/**
+	 * Test get arg.
+	 *
+	 * @return void
+	 *
+	 * @since  1.0
+	 *
+	 * @covers Joomla\Console\Command\AbstractCommand::getArgument
+	 */
+	public function testGetArgument()
+	{
+		$this->instance->getInput()->args = array('flower', 'sakura');
+
+		$this->assertEquals('flower', $this->instance->getArgument(0), 'First arg not matched.');
+
+		$this->assertEquals('rose', $this->instance->getArgument(2, 'rose'), 'Default value not matched.');
+
+		$callback = function()
+		{
+			return 'Morning Glory';
+		};
+
+		$this->assertEquals('Morning Glory', $this->instance->getArgument(2, $callback), 'Default value not matched.');
 	}
 
 	/**
